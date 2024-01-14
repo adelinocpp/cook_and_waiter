@@ -20,7 +20,7 @@ main.o: main.cpp
 ctask.o: 
 	$(CPP) -o ctask.o CTask.cpp -c $(CPPFLAGS)
 ctasklist.o: ctask.o cookfunctions.o
-	$(CPP) -o cookfunctions.o ctasklist.o CTaskList.cpp -c $(CPPFLAGS)
+	$(CPP) -o ctasklist.o CTaskList.cpp -c $(CPPFLAGS)
 cookfunctions.o:
 	$(CPP) -o cookfunctions.o CookFunctions.cpp -c $(CPPFLAGS)
 jsoncpp.o: 

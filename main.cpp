@@ -135,7 +135,7 @@ string solveMessage(string buffer){
         response["mensagem"] = "Comando não executado";
         json_file = Json::writeString(builder, response);
     }
-    return ;
+    return json_file;
 }
 //-----------------------------------------------------------------------------
 void *getRunParam(void*){
@@ -218,7 +218,7 @@ void *getListenParam(void*){
     while (1) {
         // Inicio da abertura socket
         printf("\033[A\33[2K\r");
-        printf("# [%s] Escutando porta %d pela thread.\n", timeStamp(), PORT); 
+        printf("# [%s]: Escutando porta %d pela thread.\n", timeStamp(), PORT); 
         listen(main_socket,3);
         new_socket = accept(main_socket, (struct sockaddr *)&address, (socklen_t*)&addrlen);
         if (new_socket < 0){
