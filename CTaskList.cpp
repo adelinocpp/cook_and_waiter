@@ -15,7 +15,7 @@ int checkTaskFile(char * filename){
         printf("# [%s]: %s não encontrado. Criando...\n",timeStamp(),filename);
         FILE* fp = fopen(filename, "w");
         if (fp != NULL){
-            printf("#: %s criado.\n",filename);
+            printf("# [%s]: %s criado.\n",timeStamp(),filename);
             fprintf(fp, "%s \n",CTASK_GUARD);
             fprintf(fp, "%s \n",CTASK_HEADER);
             fclose(fp);
@@ -26,11 +26,11 @@ int checkTaskFile(char * filename){
         }
     }
 }
+// TODO: not load log file on memory
 //-----------------------------------------------------------------------------
 bool CTaskList::readFileTask(std::string filename, bool isLog){
     CTask readTask;
     int taskRead;
-    printf("F: %s\n",filename.c_str());
     FILE* fp = fopen(filename.c_str(), "r");
     try{
         if (fp == NULL)
@@ -39,14 +39,10 @@ bool CTaskList::readFileTask(std::string filename, bool isLog){
         size_t len = 0;
         while ((getline(&line, &len, fp)) != -1) {
             taskRead = readTask.readFileLine(line);
-            if (taskRead == 1){
-                // printf("problema: %s.\n",line);
+            if (taskRead == 1)
                 continue;
-            }
-            else{
-                printf("push: %s.\n",readTask.getUUID().c_str());
+            else
                 this->listOfTasks.push_back(readTask);
-            }
         }
         fclose(fp);
         if (line)
@@ -67,7 +63,7 @@ bool CTaskList::giveIntegrity(){
     unsigned int i, nRunning = 0;
     std::vector<int> readOrder;
     readOrder.clear();
-    printf("S: %zu.\n",listOfTasks.size());
+    // printf("S: %zu.\n",listOfTasks.size());
     for (i = 0; i < this->listOfTasks.size(); i++){
         if (this->listOfTasks[i].getStatus() == CTASK_RUNNING){
             hasRunning = true;
@@ -87,7 +83,7 @@ bool CTaskList::giveIntegrity(){
         std::sort(this->listOfTasks.begin(), this->listOfTasks.end());
     }
     this->writeFileTask();
-    printf("R: %d, L: %d, O: %d.\n",hasRunning,this->isFileLog,inOrder);
+    // printf("R: %d, L: %d, O: %d.\n",hasRunning,this->isFileLog,inOrder);
     return !(hasRunning || (!this->isFileLog && !inOrder));
 }
 //-----------------------------------------------------------------------------
@@ -106,7 +102,6 @@ int CTaskList::writeFileTask(){
             for (unsigned int i = 0; i < this->listOfTasks.size(); i++){
                 strData = this->listOfTasks[i].getDataToFile();
                 fprintf(pFile, "%s \n",strData.c_str());
-                // fputs(strData.c_str(),pFile);
             }
         }
         fclose (pFile);
