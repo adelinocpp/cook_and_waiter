@@ -29,8 +29,8 @@
 #include <time.h>
 #include "jsoncpp/json/json.h"
 
-#define ORDER_FILE "cook_order.txt"
-#define ORDER_FILE_LOG "cook_order_log.txt"
+#define ORDER_FILE "/var/www/cook_and_waiter/cook_order.txt"
+#define ORDER_FILE_LOG "/var/www/cook_and_waiter/cook_order_log.txt"
 #define PORT 12142
 
 using namespace std;
