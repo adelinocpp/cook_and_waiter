@@ -1,5 +1,17 @@
 #include "CookFunctions.h"
 
+// ----------------------------------------------------------------------------
+// --- Retorna uma estampa de tempo para ser impressa na tela.
+// --- Formato da estampa: YYYY-MM-DD-HH-MM-SS.mmm
+char* timeStamp(){
+    char* buffer = new char[30];
+    char* bReturn = new char[80];
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    strftime(buffer,30,"%Y-%m-%d-%T",localtime(&tv.tv_sec));
+    sprintf(bReturn,"%s.%03d",buffer,(int)tv.tv_usec/1000);
+    return bReturn;
+}
 //-----------------------------------------------------------------------------
 std::string executeShellCommand(const char* cmd){
     char buffer[128];
@@ -7,7 +19,7 @@ std::string executeShellCommand(const char* cmd){
     FILE* pipe = popen(cmd, "r");
     if (!pipe) 
         //throw std::runtime_error("popen() failed!");
-        printf("Falha ao chamar o comando popen()!\n");
+        printf("# [%s]: Falha ao chamar o comando popen()!\n",timeStamp());
     try {
         while (!feof(pipe)) {
             if (fgets(buffer, 128, pipe) != NULL)
@@ -82,29 +94,22 @@ std::vector<int> getListPid() {
     vecPID.clear();
     procdir = opendir("/proc");
     if (!procdir) {
-        perror("opendir failed");
+        printf("# [%s]: Comando opendir falhou.\n",timeStamp());
         return vecPID;
     }
     // Iterate through all files and directories of /proc.
     while ((entry = readdir(procdir))) {
-        // Skip anything that is not a PID directory.
         if (!is_pid_dir(entry))
             continue;
-        // Try to open /proc/<PID>/stat.
+        // tenta abrir /proc/<PID>/stat.
         snprintf(path, sizeof(path), "/proc/%s/stat", entry->d_name);
         fp = fopen(path, "r");
         if (!fp) {
-            perror(path);
+            printf("# [%s]: Falha ao abrir diretório %s.\n",timeStamp(),path);
             continue;
         }
-        // Get PID, process name and number of faults.
         fscanf(fp, "%d ",&pid);
-        // fscanf(fp, "%d %s %*c %*d %*d %*d %*d %*d %*u %*lu %*lu %lu",
-        //     &pid, &path, &maj_faults
-        // );
         vecPID.push_back(pid);
-        // Pretty print.
-        // printf("%5d %-20s: %lu\n", pid, path, maj_faults);
         fclose(fp);
     }
     closedir(procdir);
@@ -157,7 +162,6 @@ double getCpuPercent(unsigned long long &lastTotalUser, unsigned long long &last
         percent /= total;
         percent *= 100;
     }
-
     lastTotalUser = totalUser;
     lastTotalUserLow = totalUserLow;
     lastTotalSys = totalSys;

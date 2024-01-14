@@ -5,6 +5,7 @@
 #include <string>
 #include <dirent.h>
 #include <chrono>
+#include <sys/time.h>
 
 #define LOAD_BASE  5 //  milliseconds
 #define LOAD_TIME_MEAN  40 //  milliseconds
@@ -12,6 +13,7 @@
 #define MIN_MEM_PERCENT 75
 #define COMMAND_AUTH "qJT28XHm5ra8Ce4C"
 
+char* timeStamp();
 //-----------------------------------------------------------------------------
 std::string executeShellCommand(const char* cmd);
 bool checkCommand(std::string strComm);

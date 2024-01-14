@@ -2,15 +2,17 @@
 #include <string>
 #include <algorithm>
 #include <stdio.h>
+#include "CookFunctions.h"
+
 //-----------------------------------------------------------------------------
 int checkTaskFile(char * filename){
     FILE* fp = fopen(filename, "r");
     if (fp != NULL){
-        printf("#: %s encontrado.\n",filename);
+        printf("# [%s]: %s encontrado.\n",timeStamp(),filename);
         fclose(fp);
         return 0;
     } else {
-        printf("#: %s não encontrado. Criando...\n",filename);
+        printf("# [%s]: %s não encontrado. Criando...\n",timeStamp(),filename);
         FILE* fp = fopen(filename, "w");
         if (fp != NULL){
             printf("#: %s criado.\n",filename);
@@ -19,7 +21,7 @@ int checkTaskFile(char * filename){
             fclose(fp);
             return 0;
         } else{
-            printf("#: Ocorreu um problema e o arquivo %s não foi criado.\n",filename);
+            printf("# [%s]: Ocorreu um problema e o arquivo %s não foi criado.\n",timeStamp(),filename);
             return 1;
         }
     }

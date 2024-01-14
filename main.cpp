@@ -25,7 +25,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h> //inet_ntoa
 #include "CookFunctions.h"
-#include <sys/time.h>
+// #include <sys/time.h>
 #include <time.h>
 #include "jsoncpp/json/json.h"
 
@@ -48,26 +48,16 @@ CTaskList logListOfTasks;
 vector<int> PIDs;
 std::mutex g_num_mutex;
 
-/*
-std::string getEnvVar( std::string const & key ) const
-{
-    char * val = getenv( key.c_str() );
-    return val == NULL ? std::string("") : std::string(val);
-}
 
-*/
 // ----------------------------------------------------------------------------
-char* timeStamp(){
-    char* buffer = new char[30];
-    char* bReturn = new char[80];
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    strftime(buffer,30,"%m-%d-%Y-%T",localtime(&tv.tv_sec));
-
-    sprintf(bReturn,"%s.%03d",buffer,(int)tv.tv_usec/1000);
-    return bReturn;
-}
-// ----------------------------------------------------------------------------
+// --- Funcao para resolver as mensagens aceitas pelo servidor
+// --- Funcao muito repetitiva, precisa melhorar
+// --- Requisições:
+//      GET: e.g.  http://127.0.0.1:12142/?command=stress -c 4 --vm 4 --vm-bytes 4096M -t 10s (do nothing)
+//      GET: e.g.  http://127.0.0.1:12142/list_tasks (ok)
+//      POST: e.g.  http://127.0.0.1:12142/queue (ok)
+//      POST: e.g.  http://127.0.0.1:12142/dequeue (not ready)
+//      POST: e.g.  http://127.0.0.1:12142/postpone (not ready)
 string solveMessage(string buffer){
     bool getFirst = buffer.find("GET /?command=") != -1;
     bool getListOfTasks = buffer.find("GET /list_tasks HTTP/1.1") != -1;
@@ -77,7 +67,6 @@ string solveMessage(string buffer){
     int posLeftBlacket = buffer.find("{") ;
     int posRightBlacket = buffer.find("}");
     bool hasBody  = ((posLeftBlacket != -1) && (posRightBlacket != -1));
-
 
     Json::Value body, response;
     Json::CharReaderBuilder builderJSON;
@@ -91,28 +80,30 @@ string solveMessage(string buffer){
     // TODO: Implementar as demais requisições
     // TODO: modo verbose
     if (getFirst){
-        printf("Primeira Mensagem.\n");
-    }
-    if (getListOfTasks && hasBody){
-        printf("Solicita lista de tarefas.\n");
-
-        rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
-        rawJsonLength = static_cast<int>(rawJson.length());
-        jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
-        
-        response["lista"] = listOfTasks.getListOfTask();
+        printf("# [%s]: Primeira Mensagem.\n",timeStamp());
+        response["mensagem"] = "Comando não executado";
         json_file = Json::writeString(builder, response);
-        if (jsonOK)
-            printf("%s.\n",json_file.c_str());
-        else
-            printf("Problema com json: %s.\n",err.c_str());
-        return json_file;
-    }
-    if (postQueue && hasBody){
-        printf("Adiciona an fila.\n");
+    } else if (getListOfTasks && hasBody){
+        printf("# [%s]: Solicita lista de tarefas.\n",timeStamp());
+        // --- TODO: emcapsular estas 3 linhas
         rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
         rawJsonLength = static_cast<int>(rawJson.length());
         jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
+        // --- TODO: encapsular o tratamento 
+        if (jsonOK){
+            response["lista"] = listOfTasks.getListOfTask();
+        }else
+            printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+        // --------
+        json_file = Json::writeString(builder, response);
+        return json_file;
+    } else if (postQueue && hasBody){
+        printf("# [%s]: Adiciona an fila.\n",timeStamp());
+        // --- TODO: emcapsular estas 3 linhas
+        rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
+        rawJsonLength = static_cast<int>(rawJson.length());
+        jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
+        // --- TODO: encapsular o tratamento 
         if (jsonOK){
             if (body["token"] == COMMAND_AUTH){
                 CTask recieveTask;
@@ -121,42 +112,31 @@ string solveMessage(string buffer){
                 recieveTask.setSchedTime(timeStamp());
                 listOfTasks.queueTask(recieveTask);
                 if (listOfTasks.writeFileTask() == 0){
-                    // 
                     response["mensagem"] = "Comando executado";
                     response["uuid"] = recieveTask.getUUID();
                 }
-            }
-            else{
+            } else{
                 response["mensagem"] = "Comando não executado";
             }
-            printf("%s.\n",json_file.c_str());
-        }
-        else
-            printf("Problema com json: %s.\n",err.c_str());
+        } else
+            printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+        // --------
         json_file = Json::writeString(builder, response);
         return json_file;
-        // jsonOK = readerJSON.parse( buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket).c_str(), body, false );
-        // printf("%s.\n",body.asCString());
+    } else if (postDequeue && hasBody){
+        printf("# [%s]: Remove da fila.\n",timeStamp());
+        response["mensagem"] = "Comando não executado";
+        json_file = Json::writeString(builder, response);
+    } else if (postPostpone && hasBody){
+        printf("# [%s]: Adia na fila.\n",timeStamp());
+        response["mensagem"] = "Comando não executado";
+        json_file = Json::writeString(builder, response);
+    } else{
+        response["mensagem"] = "Comando não executado";
+        json_file = Json::writeString(builder, response);
     }
-    if (postDequeue && hasBody){
-        printf("Remove da fila.\n");
-        // jsonOK = readerJSON.parse( buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket).c_str(), body, false );
-        // printf("%s.\n",body.asCString());
-    }
-    if (postPostpone && hasBody){
-        printf("Adia na fila.\n");
-        // jsonOK = readerJSON.parse( buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket).c_str(), body, false );
-        // printf("%s.\n",body.asCString());
-    }
-    // nlohmann::json ex1 = nlohmann::json::parse(buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket));
-    // printf("%s.\n",ex1.dump().c_str());
-    // std::string retKey = "";
-    // if (pos != std::string::npos)
-    //     retKey = buffer.substr(pos+9,64); 
-    return buffer;
+    return ;
 }
-//-----------------------------------------------------------------------------
-
 //-----------------------------------------------------------------------------
 void *getRunParam(void*){
     unsigned int nPeriods = 0, i;
@@ -166,8 +146,8 @@ void *getRunParam(void*){
     CTask tTask;
     while (1) {
         nPeriods++;
-        cpu = getCpuPercent(lastTotalUser, lastTotalUserLow, 
-                            lastTotalSys, lastTotalIdle);
+        cpu = getCpuPercent(lastTotalUser, lastTotalUserLow, lastTotalSys, 
+                            lastTotalIdle);
         men = getMemFreePercente();
         sumCPU += cpu;
         sumMem += men;
@@ -189,7 +169,7 @@ void *getRunParam(void*){
         }
        
         if ((PIDrunning > 0) && !cPIDrunning){
-             printf("File com PID: %d, running: %d.\n",PIDrunning,cPIDrunning);
+             printf("# [%s]: File com PID: %d, running: %d.\n",timeStamp(),PIDrunning,cPIDrunning);
             // --- INÍCIO: Seção crítica
             g_num_mutex.lock(); 
             tTask = listOfTasks[0];
@@ -218,12 +198,12 @@ void *getListenParam(void*){
     std::string jsonMessage;
     // Criação do socket principal
     if( (main_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) {  
-        printf("Falha ao iniciar socket.");  
+        printf("# [%s]: Falha ao iniciar socket.",timeStamp());  
         exit(EXIT_FAILURE);  
     }  
     if( setsockopt(main_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, 
             sizeof(opt)) < 0 ) {  
-        printf("Erro ao realizar o setsockopt.");  
+        printf("# [%s]: Erro ao realizar o setsockopt.",timeStamp());  
         exit(EXIT_FAILURE);  
     }  
     // Definições so socket criado
@@ -232,41 +212,40 @@ void *getListenParam(void*){
     address.sin_port = htons( PORT );  
     // Vincula (bind) o socket a porta PORT (12142)
     if (bind(main_socket, (struct sockaddr *)&address, sizeof(address))<0)  {  
-        printf("Falha no bind.");  
+        printf("# [%s]: Falha no bind.",timeStamp());  
         exit(EXIT_FAILURE);  
     }  
     while (1) {
         // Inicio da abertura socket
         printf("\033[A\33[2K\r");
-        printf("[%s] Escutando porta %d pela thread.\n", timeStamp(), PORT); 
+        printf("# [%s] Escutando porta %d pela thread.\n", timeStamp(), PORT); 
         listen(main_socket,3);
         new_socket = accept(main_socket, (struct sockaddr *)&address, (socklen_t*)&addrlen);
-        if (new_socket < 0)
-            printf("ERROR on accept.\n");
+        if (new_socket < 0){
+            printf("# [%s]: ERROR on accept.\n",timeStamp());
+            break;
+        }
         // --- INÍCIO: Seção crítica
         g_num_mutex.lock(); 
-        // close(main_socket);
         bzero(buffer,1024);
         int n = read(new_socket,buffer,1024);
-        if (n < 0) 
-            printf("Erro na leitura de dados do socket.\n");
-        // 
-        // g_num_mutex.lock(); 
+        if (n < 0){ 
+            printf("# [%s]: Erro na leitura de dados do socket.\n",timeStamp());
+            g_num_mutex.unlock(); 
+            break;
+        }
         jsonMessage = solveMessage(buffer);
-        // g_num_mutex.unlock(); 
-        //string jsonMessage = "{\"status\":\"ok\",\"pid\":\"1\",\"user\":\"1\"}";        
         string reply = "HTTP/1.1 200 OK\nContent-Type: json\nContent-Length: " +
                         to_string(jsonMessage.size()) + 
                         "\nAccept-Ranges: bytes\nConnection: close\n\n" + jsonMessage;
         n = send(new_socket, reply.c_str(), strlen(reply.c_str()), 0);
         if( n > 0 ) {  
-            printf("Mensagem devolvida com sucesso.\n");  
+            printf("# [%s]: Mensagem devolvida com sucesso.\n",timeStamp());  
         }  
         shutdown(new_socket,SHUT_RDWR);
         close(new_socket);
         // --- FIM: Seção crítica
         g_num_mutex.unlock(); 
-        //sleep_until(system_clock::now() + milliseconds(1000));
     }
     pthread_exit(NULL);
 }
@@ -283,43 +262,45 @@ int main(int argc , char *argv[]) {
     ckOrderFile = checkTaskFile((char*)ORDER_FILE);
     ckOrderFileLog = checkTaskFile((char*)ORDER_FILE_LOG);
     if ((ckOrderFile == 0) && (ckOrderFileLog == 0)){
-        printf("#: Arquivos de registros OK.\n");
+        printf("# [%s]: Arquivos de registros OK.\n",timeStamp());
     }
     else{
-        printf("Falha na carga e leitura dos arquivos de registros. Order file %d; Log file: %d.\n",(ckOrderFile == 0),(ckOrderFileLog == 0));
+        printf("# [%s]: Falha na carga e leitura dos arquivos de registros. "
+            "Order file %d; Log file: %d.\n",timeStamp(),(ckOrderFile == 0),
+            (ckOrderFileLog == 0));
         return 1;
     }
-    // Faz a leitura do arquivo de entrada
+    // --- Faz a leitura do arquivo de entrada --------------------------------
     ckOrderList = listOfTasks.readFileTask((char*)ORDER_FILE);
     ckOrderLog = logListOfTasks.readFileTask((char*)ORDER_FILE_LOG,true);
     if (!ckOrderList || !ckOrderLog){
-        printf("Falha na associação dos arquivos de registros. Order file %d; Log file: %d.\n",ckOrderList,ckOrderLog);
+        printf("# [%s]: Falha na associação dos arquivos de registros. Order "
+        "file %d; Log file: %d.\n",timeStamp(),ckOrderList,ckOrderLog);
         return 1;
     }
     // Verifica integridade dos dados e se existia tarefa rodando
     PIDs = getListPid(); 
-    printf("#: Integridade lista %s.\n",listOfTasks.giveIntegrity() ? "ok": "falhou");
-    printf("#: Integridade log %s.\n",logListOfTasks.giveIntegrity() ? "ok": "falhou");
-    printf("#: N° de processo %zu.\n",PIDs.size());
-    sleep_until(system_clock::now() + milliseconds(5000));
-    // +++ Após esta etapa precisa habilitar as seções críticas +++++++++++++++
+    printf("# [%s]: Integridade lista %s.\n",timeStamp(),
+            listOfTasks.giveIntegrity() ? "ok": "falhou");
+    printf("# [%s]: Integridade log %s.\n",timeStamp(),
+            logListOfTasks.giveIntegrity() ? "ok": "falhou");
+    printf("# [%s]: N° de processo %zu.\n",timeStamp(),PIDs.size());
     //  Thread de monitoramento
     pthread_create(&inputTimer, NULL, getRunParam, NULL); //Error here
+    sleep_until(system_clock::now() + milliseconds(1000));
     // Período de latência para ajste das medidas de CPU e memória
-    printf("#: CPU: %5.2f, Men: %5.2f\n",percentCPU,percentFreeMemory);
-    printf("#: Escutando...\n");
+    printf("# [%s]: CPU: %5.2f, Men: %5.2f\n",timeStamp(),percentCPU,percentFreeMemory);
+    printf("# [%s]: Escutando...\n",timeStamp());
     //  Thread de escuta
     pthread_create(&inputListen, NULL, getListenParam, NULL); //Error here
     
     while(1){
-        printf("CPU: %4.1f (%4.1f), memoria %4.1f (%4.1f), Tasks: %u.\n",percentCPU,(float)MAX_CPU_PERCENT,percentFreeMemory,(float)MIN_MEM_PERCENT,listOfTasks.size());
+        // printf("CPU: %4.1f (%4.1f), memoria %4.1f (%4.1f), Tasks: %u.\n",percentCPU,(float)MAX_CPU_PERCENT,percentFreeMemory,(float)MIN_MEM_PERCENT,listOfTasks.size());
         if ((percentCPU < (float)MAX_CPU_PERCENT) && (percentFreeMemory > (float)MIN_MEM_PERCENT) && 
             isIdle && (listOfTasks.size() > 0)){
-            
             // --- INÍCIO: Seção crítica
             g_num_mutex.lock(); 
             tTask = listOfTasks[0];
-            // std::string runNohupCommand = "nohup " + tTask.getCommand() + " 2>&1 &";
             PIDrunning = executeShellCommandPid(tTask.getCommand().c_str());
             if (PIDrunning > 0){
                 // Executando com sucesso
@@ -348,7 +329,7 @@ int main(int argc , char *argv[]) {
             g_num_mutex.unlock();
         }
         else
-            sleep_until(system_clock::now() + milliseconds(1000));
+            sleep_until(system_clock::now() + milliseconds(50));
     }
     return 0;
 }

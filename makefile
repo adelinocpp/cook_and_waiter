@@ -19,8 +19,8 @@ main.o: main.cpp
 	$(CPP) -o main.o main.cpp -c $(CPPFLAGS)
 ctask.o: 
 	$(CPP) -o ctask.o CTask.cpp -c $(CPPFLAGS)
-ctasklist.o: ctask.o 
-	$(CPP) -o ctasklist.o CTaskList.cpp -c $(CPPFLAGS)
+ctasklist.o: ctask.o cookfunctions.o
+	$(CPP) -o cookfunctions.o ctasklist.o CTaskList.cpp -c $(CPPFLAGS)
 cookfunctions.o:
 	$(CPP) -o cookfunctions.o CookFunctions.cpp -c $(CPPFLAGS)
 jsoncpp.o: 
