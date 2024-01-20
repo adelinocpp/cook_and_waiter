@@ -29,8 +29,10 @@
 #include <time.h>
 #include "jsoncpp/json/json.h"
 
-#define ORDER_FILE "/var/www/cook_and_waiter/cook_order.txt"
-#define ORDER_FILE_LOG "/var/www/cook_and_waiter/cook_order_log.txt"
+// #define ORDER_FILE "/var/www/cook_and_waiter/cook_order.txt"
+// #define ORDER_FILE_LOG "/var/www/cook_and_waiter/cook_order_log.txt"
+#define ORDER_FILE "cook_order.txt"
+#define ORDER_FILE_LOG "cook_order_log.txt"
 #define PORT 12142
 
 using namespace std;
@@ -176,10 +178,9 @@ void *getRunParam(void*){
             tTask.setEndTime(timeStamp());
             tTask.setStatus(CTASK_FINISH);
             tTask.setPosition(-1);
-            logListOfTasks.queueTask(tTask);
             listOfTasks.dequeueTasks(0);
             listOfTasks.writeFileTask();
-            logListOfTasks.writeFileTask();
+            logListOfTasks.writeTaskLogFile(tTask);
             PIDrunning = -1;
             isIdle = true;
             // --- FIM: Seção crítica
@@ -212,7 +213,7 @@ void *getListenParam(void*){
     address.sin_port = htons( PORT );  
     // Vincula (bind) o socket a porta PORT (12142)
     if (bind(main_socket, (struct sockaddr *)&address, sizeof(address))<0)  {  
-        printf("# [%s]: Falha no bind.",timeStamp());  
+        printf("# [%s]: Falha no bind.\n",timeStamp());  
         exit(EXIT_FAILURE);  
     }  
     while (1) {
@@ -284,6 +285,8 @@ int main(int argc , char *argv[]) {
             listOfTasks.giveIntegrity() ? "ok": "falhou");
     printf("# [%s]: Integridade log %s.\n",timeStamp(),
             logListOfTasks.giveIntegrity() ? "ok": "falhou");
+    // --- Libera arquivo de log da memória -----------------------------------
+    logListOfTasks.freeMemoryFileTask();
     printf("# [%s]: N° de processo %zu.\n",timeStamp(),PIDs.size());
     //  Thread de monitoramento
     pthread_create(&inputTimer, NULL, getRunParam, NULL); //Error here
@@ -320,9 +323,10 @@ int main(int argc , char *argv[]) {
                 tTask.setPosition(-1);
                 tTask.setError("Falha de execução");
                 listOfTasks.dequeueTasks(0);
-                listOfTasks.writeFileTask();    
-                logListOfTasks.queueTask(tTask);
-                logListOfTasks.writeFileTask();
+                listOfTasks.writeFileTask();   
+                logListOfTasks.writeTaskLogFile(tTask);
+                // logListOfTasks.queueTask(tTask);
+                // logListOfTasks.writeFileTask();
                 isIdle = true;
             }
             // --- FIM: Seção crítica

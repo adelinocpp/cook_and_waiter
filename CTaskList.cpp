@@ -26,7 +26,6 @@ int checkTaskFile(char * filename){
         }
     }
 }
-// TODO: not load log file on memory
 //-----------------------------------------------------------------------------
 bool CTaskList::readFileTask(std::string filename, bool isLog){
     CTask readTask;
@@ -63,7 +62,6 @@ bool CTaskList::giveIntegrity(){
     unsigned int i, nRunning = 0;
     std::vector<int> readOrder;
     readOrder.clear();
-    // printf("S: %zu.\n",listOfTasks.size());
     for (i = 0; i < this->listOfTasks.size(); i++){
         if (this->listOfTasks[i].getStatus() == CTASK_RUNNING){
             hasRunning = true;
@@ -83,15 +81,30 @@ bool CTaskList::giveIntegrity(){
         std::sort(this->listOfTasks.begin(), this->listOfTasks.end());
     }
     this->writeFileTask();
-    // printf("R: %d, L: %d, O: %d.\n",hasRunning,this->isFileLog,inOrder);
     return !(hasRunning || (!this->isFileLog && !inOrder));
 }
+//-----------------------------------------------------------------------------
+int CTaskList::writeTaskLogFile(CTask logTask) {
+    bool returnValue = 0;
+    if (!this->isFileLog)
+        return 1;
+    FILE* pFile = fopen(this->fileName.c_str(), "a+");
+    try{
+        if (pFile!=NULL){
+            fprintf(pFile, "%s \n",logTask.getDataToFile().c_str());
+            fclose (pFile);
+        }
+    }catch(...){
+        if (pFile != NULL)
+            fclose(pFile);
+        returnValue = 1;
+    }
+    return returnValue;
+};
 //-----------------------------------------------------------------------------
 int CTaskList::writeFileTask(){  
     bool returnValue = 0;
     std::string strData, mode = "w";
-    // if (this->isFileLog)
-    //     mode = "a+";
     FILE* pFile = fopen(this->fileName.c_str(), mode.c_str());
     try{
         if (pFile!=NULL){
@@ -113,12 +126,16 @@ int CTaskList::writeFileTask(){
     return returnValue;
 }
 //-----------------------------------------------------------------------------
-int getIdxByTag(std::string tag){
+int getIdxByTag(std::string tag, bool mfirst){
+    // TODO: implement this function
+    // Return de index(s) of task on vector by tag
     int returnValue = -1;
     return returnValue;
 };
 //-----------------------------------------------------------------------------
 int CTaskList::getIdxByUUID(std::string uuid){
+    // TODO: implement this function
+    // Return de index of task on vector by UUID
     int returnValue = -1;
     return returnValue;
 };

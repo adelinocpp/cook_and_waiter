@@ -24,9 +24,18 @@ class CTaskList{
             };
         inline ~CTaskList(){listOfTasks.clear();};
         bool readFileTask(std::string filename, bool isLog=false);
+        inline int freeMemoryFileTask(){
+            if (this->isFileLog){
+                this->listOfTasks.clear();
+                return 0;
+            }
+            else
+                return 1;
+        };
         bool giveIntegrity();
         int writeFileTask();
-        int getIdxByTag(std::string tag);
+        int writeTaskLogFile(CTask logTask);
+        int getIdxByTag(std::string tag, bool mfirst=true);
         int getIdxByUUID(std::string uuid);
         std::string listTasks();
         bool queueTask(CTask qTask);
