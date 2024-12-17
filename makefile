@@ -4,7 +4,7 @@ PROJ_NAME = cook_and_waiter
 SOURCE_LIBS = -lstdc++ -lpthread
 JSONCPP_INCLUDE_PATH = ./jsoncpp/
 # Diretivas de compilacao
-CPPFLAGS = -MMD -O3 -Wall -std=c++11 -fnon-call-exceptions -Wreturn-stack-address
+CPPFLAGS = -MMD -O3 -Wall -std=c++11 -fnon-call-exceptions # -Wreturn-stack-address
 # compilador
 CPP = clang++
 # comando de remocao

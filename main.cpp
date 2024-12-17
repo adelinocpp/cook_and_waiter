@@ -5,6 +5,7 @@
 // sudo apt install clang
 // sudo apt install libc++-dev
 // -> sudo apt install g++-12
+// sudo apt-get install libboost-dev
 
 #include <stdlib.h>
 #include <thread>
@@ -44,7 +45,7 @@ static unsigned long long lastTotalUser, lastTotalUserLow,
                             lastTotalSys, lastTotalIdle;
 double percentCPU, percentFreeMemory;
 int PIDrunning = -1;
-bool isIdle = false;
+bool isIdle = true;
 CTaskList listOfTasks;
 CTaskList logListOfTasks;
 vector<int> PIDs;
@@ -83,32 +84,39 @@ string solveMessage(string buffer){
     // TODO: modo verbose
     if (getFirst){
         printf("# [%s]: Primeira Mensagem.\n",timeStamp());
+        fflush(stdout);
         response["mensagem"] = "Comando não executado";
         json_file = Json::writeString(builder, response);
     } else if (getListOfTasks && hasBody){
         printf("# [%s]: Solicita lista de tarefas.\n",timeStamp());
-        // --- TODO: emcapsular estas 3 linhas
+        fflush(stdout);
+        // --- TODO: encapsular estas 3 linhas
         rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
         rawJsonLength = static_cast<int>(rawJson.length());
         jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
         // --- TODO: encapsular o tratamento 
         if (jsonOK){
             response["lista"] = listOfTasks.getListOfTask();
-        }else
+        }else{
             printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+            fflush(stdout);
+        }
         // --------
         json_file = Json::writeString(builder, response);
         return json_file;
     } else if (postQueue && hasBody){
         printf("# [%s]: Adiciona an fila.\n",timeStamp());
-        // --- TODO: emcapsular estas 3 linhas
+        fflush(stdout);
+        // --- TODO: encapsular estas 3 linhas
         rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
         rawJsonLength = static_cast<int>(rawJson.length());
         jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
         // --- TODO: encapsular o tratamento 
+        // g_num_mutex.lock();
         if (jsonOK){
             if (body["token"] == COMMAND_AUTH){
                 CTask recieveTask;
+                
                 recieveTask.setCommand(body["command"].asString());
                 recieveTask.setTag(body["tag"].asString());
                 recieveTask.setSchedTime(timeStamp());
@@ -117,20 +125,27 @@ string solveMessage(string buffer){
                     response["mensagem"] = "Comando executado";
                     response["uuid"] = recieveTask.getUUID();
                 }
+                
             } else{
                 response["mensagem"] = "Comando não executado";
             }
-        } else
+        
+        } else{
             printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+            fflush(stdout);
+        }
+        // g_num_mutex.unlock();
         // --------
         json_file = Json::writeString(builder, response);
         return json_file;
     } else if (postDequeue && hasBody){
         printf("# [%s]: Remove da fila.\n",timeStamp());
+        fflush(stdout);
         response["mensagem"] = "Comando não executado";
         json_file = Json::writeString(builder, response);
     } else if (postPostpone && hasBody){
         printf("# [%s]: Adia na fila.\n",timeStamp());
+        fflush(stdout);
         response["mensagem"] = "Comando não executado";
         json_file = Json::writeString(builder, response);
     } else{
@@ -171,7 +186,8 @@ void *getRunParam(void*){
         }
        
         if ((PIDrunning > 0) && !cPIDrunning){
-             printf("# [%s]: File com PID: %d, running: %d.\n",timeStamp(),PIDrunning,cPIDrunning);
+            printf("# [%s]: File com PID: %d, running: %d.\n",timeStamp(),PIDrunning,cPIDrunning);
+            fflush(stdout);
             // --- INÍCIO: Seção crítica
             g_num_mutex.lock(); 
             tTask = listOfTasks[0];
@@ -180,13 +196,17 @@ void *getRunParam(void*){
             tTask.setPosition(-1);
             listOfTasks.dequeueTasks(0);
             listOfTasks.writeFileTask();
+            // printf("# [%s]: Inicio escreve LOG.\n",timeStamp());
+            // fflush(stdout);
             logListOfTasks.writeTaskLogFile(tTask);
+            // printf("# [%s]: Fim escreve LOG.\n",timeStamp());
+            // fflush(stdout);
             PIDrunning = -1;
             isIdle = true;
             // --- FIM: Seção crítica
             g_num_mutex.unlock(); 
         }
-        sleep_until(system_clock::now() + milliseconds(LOAD_BASE));
+        std::this_thread::sleep_until(system_clock::now() + milliseconds(LOAD_BASE));
     }
     pthread_exit(NULL);
 }
@@ -200,11 +220,13 @@ void *getListenParam(void*){
     // Criação do socket principal
     if( (main_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) {  
         printf("# [%s]: Falha ao iniciar socket.",timeStamp());  
+        fflush(stdout);
         exit(EXIT_FAILURE);  
     }  
     if( setsockopt(main_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, 
             sizeof(opt)) < 0 ) {  
         printf("# [%s]: Erro ao realizar o setsockopt.",timeStamp());  
+        fflush(stdout);
         exit(EXIT_FAILURE);  
     }  
     // Definições so socket criado
@@ -214,25 +236,33 @@ void *getListenParam(void*){
     // Vincula (bind) o socket a porta PORT (12142)
     if (bind(main_socket, (struct sockaddr *)&address, sizeof(address))<0)  {  
         printf("# [%s]: Falha no bind.\n",timeStamp());  
+        fflush(stdout);
         exit(EXIT_FAILURE);  
     }  
     while (1) {
         // Inicio da abertura socket
-        printf("\033[A\33[2K\r");
+        // printf("\033[A\33[2K\r");
+        printf("# [%s]: ---------------------------------------------------------------\n",timeStamp());
+        fflush(stdout);
         printf("# [%s]: Escutando porta %d pela thread.\n", timeStamp(), PORT); 
+        fflush(stdout);
         listen(main_socket,3);
         new_socket = accept(main_socket, (struct sockaddr *)&address, (socklen_t*)&addrlen);
         if (new_socket < 0){
             printf("# [%s]: ERROR on accept.\n",timeStamp());
+            fflush(stdout);
             break;
         }
         // --- INÍCIO: Seção crítica
-        g_num_mutex.lock(); 
+        g_num_mutex.lock();
+        // printf("Mutex lock.\n"); 
         bzero(buffer,1024);
         int n = read(new_socket,buffer,1024);
         if (n < 0){ 
             printf("# [%s]: Erro na leitura de dados do socket.\n",timeStamp());
+            fflush(stdout);
             g_num_mutex.unlock(); 
+            // printf("Mutex unlock.\n");
             break;
         }
         jsonMessage = solveMessage(buffer);
@@ -242,69 +272,98 @@ void *getListenParam(void*){
         n = send(new_socket, reply.c_str(), strlen(reply.c_str()), 0);
         if( n > 0 ) {  
             printf("# [%s]: Mensagem devolvida com sucesso.\n",timeStamp());  
+            fflush(stdout);
         }  
         shutdown(new_socket,SHUT_RDWR);
         close(new_socket);
         // --- FIM: Seção crítica
         g_num_mutex.unlock(); 
+        // printf("Mutex unlock.\n");
     }
     pthread_exit(NULL);
 }
 //-----------------------------------------------------------------------------
-int main(int argc , char *argv[]) {  
+int main(int argc, char* argv[]) {  
     int ckOrderFile, ckOrderFileLog;
     bool ckOrderList, ckOrderLog;
     initCpuPercent(lastTotalUser, lastTotalUserLow, 
                             lastTotalSys, lastTotalIdle);
+    
+    // std::string logDir = getenv("LOG_DIR");
+    std::string logDir = "/var/www/cook_and_waiter/";
+    std::string strOrderFileFullPath = logDir + std::string(ORDER_FILE);
+    std::string strOrderFileLogFullPath = logDir + std::string(ORDER_FILE_LOG);
+    
+    printf("# [%s]: Arquivo: %s.\n",timeStamp(),strOrderFileFullPath.c_str()); 
+    fflush(stdout);
+    printf("# [%s]: Arquivo: %s.\n",timeStamp(),strOrderFileLogFullPath.c_str()); 
+    fflush(stdout);
     CTask tTask;
     pthread_t inputTimer, inputListen;
     isIdle = true;
     // Verifica Arquivo
-    ckOrderFile = checkTaskFile((char*)ORDER_FILE);
-    ckOrderFileLog = checkTaskFile((char*)ORDER_FILE_LOG);
+    ckOrderFile = checkTaskFile((char*) strOrderFileFullPath.c_str());
+    ckOrderFileLog = checkTaskFile((char*) strOrderFileLogFullPath.c_str());
     if ((ckOrderFile == 0) && (ckOrderFileLog == 0)){
         printf("# [%s]: Arquivos de registros OK.\n",timeStamp());
+        fflush(stdout);
     }
     else{
         printf("# [%s]: Falha na carga e leitura dos arquivos de registros. "
             "Order file %d; Log file: %d.\n",timeStamp(),(ckOrderFile == 0),
             (ckOrderFileLog == 0));
+        fflush(stdout);
         return 1;
     }
     // --- Faz a leitura do arquivo de entrada --------------------------------
-    ckOrderList = listOfTasks.readFileTask((char*)ORDER_FILE);
-    ckOrderLog = logListOfTasks.readFileTask((char*)ORDER_FILE_LOG,true);
+    ckOrderList = listOfTasks.readFileTask((char*) strOrderFileFullPath.c_str());
+    ckOrderLog = logListOfTasks.readFileTask((char*) strOrderFileLogFullPath.c_str(),true);
     if (!ckOrderList || !ckOrderLog){
         printf("# [%s]: Falha na associação dos arquivos de registros. Order "
         "file %d; Log file: %d.\n",timeStamp(),ckOrderList,ckOrderLog);
+        fflush(stdout);
         return 1;
     }
     // Verifica integridade dos dados e se existia tarefa rodando
     PIDs = getListPid(); 
-    printf("# [%s]: Integridade lista %s.\n",timeStamp(),
-            listOfTasks.giveIntegrity() ? "ok": "falhou");
-    printf("# [%s]: Integridade log %s.\n",timeStamp(),
-            logListOfTasks.giveIntegrity() ? "ok": "falhou");
+    printf("# [%s]: Integridade lista %s (%d).\n",timeStamp(),
+            listOfTasks.giveIntegrity() ? "ok": "falhou",listOfTasks.size());
+    fflush(stdout);            
+    printf("# [%s]: Integridade log %s (%d).\n",timeStamp(),
+            logListOfTasks.giveIntegrity() ? "ok": "falhou",logListOfTasks.size());
+    fflush(stdout);
     // --- Libera arquivo de log da memória -----------------------------------
     logListOfTasks.freeMemoryFileTask();
     printf("# [%s]: N° de processo %zu.\n",timeStamp(),PIDs.size());
+    fflush(stdout);
     //  Thread de monitoramento
     pthread_create(&inputTimer, NULL, getRunParam, NULL); //Error here
-    sleep_until(system_clock::now() + milliseconds(1000));
+    std::this_thread::sleep_until(system_clock::now() + milliseconds(1000));
     // Período de latência para ajste das medidas de CPU e memória
-    printf("# [%s]: CPU: %5.2f, Men: %5.2f\n",timeStamp(),percentCPU,percentFreeMemory);
+    printf("# [%s]: CPU: %5.2f %%, Men: %5.2f %% \n",timeStamp(),percentCPU,percentFreeMemory);
+    fflush(stdout);
     printf("# [%s]: Escutando...\n",timeStamp());
+    fflush(stdout);
     //  Thread de escuta
     pthread_create(&inputListen, NULL, getListenParam, NULL); //Error here
     
     while(1){
-        // printf("CPU: %4.1f (%4.1f), memoria %4.1f (%4.1f), Tasks: %u.\n",percentCPU,(float)MAX_CPU_PERCENT,percentFreeMemory,(float)MIN_MEM_PERCENT,listOfTasks.size());
+        // printf("# [%s]: CPU: %4.1f (%4.1f), memoria %4.1f (%4.1f), Tasks: %u, Idle %d.\n",
+        //     timeStamp(),percentCPU,(float)MAX_CPU_PERCENT,percentFreeMemory,
+        //     (float)MIN_MEM_PERCENT,listOfTasks.size(),isIdle);
+        // printf("# [%s]: CPU: %d, memoria %d, Tasks: %u, Idle %d.\n",
+        //     timeStamp(),(percentCPU < (float)MAX_CPU_PERCENT),(percentFreeMemory > (float)MIN_MEM_PERCENT),
+        //     (listOfTasks.size() > 0),isIdle);
         if ((percentCPU < (float)MAX_CPU_PERCENT) && (percentFreeMemory > (float)MIN_MEM_PERCENT) && 
             isIdle && (listOfTasks.size() > 0)){
             // --- INÍCIO: Seção crítica
             g_num_mutex.lock(); 
+            // printf("Mutex lock.\n");
             tTask = listOfTasks[0];
+            
             PIDrunning = executeShellCommandPid(tTask.getCommand().c_str());
+            // printf("Executando Comando: %s",tTask.getCommand().c_str());
+            // printf("Executando Comando PID: %d",PIDrunning);
             if (PIDrunning > 0){
                 // Executando com sucesso
                 isIdle = false;
@@ -323,17 +382,25 @@ int main(int argc , char *argv[]) {
                 tTask.setPosition(-1);
                 tTask.setError("Falha de execução");
                 listOfTasks.dequeueTasks(0);
-                listOfTasks.writeFileTask();   
+                listOfTasks.writeFileTask();
+                // printf("# [%s]: Inicio escreve LOG.\n",timeStamp());
+                // fflush(stdout);
                 logListOfTasks.writeTaskLogFile(tTask);
+                // printf("# [%s]: Fim escreve LOG.\n",timeStamp());
+                // fflush(stdout);
                 // logListOfTasks.queueTask(tTask);
                 // logListOfTasks.writeFileTask();
                 isIdle = true;
             }
             // --- FIM: Seção crítica
             g_num_mutex.unlock();
+            // printf("Mutex unlock.\n");
         }
-        else
-            sleep_until(system_clock::now() + milliseconds(50));
+        else{
+            // printf("# [%s]: Sleeping 5000 ms.\n",timeStamp());
+            std::this_thread::sleep_until(system_clock::now() + milliseconds(50));
+        }
     }
+    // printf("Sleeping 5000 ms.\n");
     return 0;
 }

@@ -9,6 +9,7 @@ int checkTaskFile(char * filename){
     FILE* fp = fopen(filename, "r");
     if (fp != NULL){
         printf("# [%s]: %s encontrado.\n",timeStamp(),filename);
+        fflush(stdout);
         fclose(fp);
         return 0;
     } else {
@@ -16,12 +17,16 @@ int checkTaskFile(char * filename){
         FILE* fp = fopen(filename, "w");
         if (fp != NULL){
             printf("# [%s]: %s criado.\n",timeStamp(),filename);
+            fflush(stdout);
             fprintf(fp, "%s \n",CTASK_GUARD);
+            fflush(stdout);
             fprintf(fp, "%s \n",CTASK_HEADER);
+            fflush(stdout);
             fclose(fp);
             return 0;
         } else{
             printf("# [%s]: Ocorreu um problema e o arquivo %s não foi criado.\n",timeStamp(),filename);
+            fflush(stdout);
             return 1;
         }
     }
@@ -89,9 +94,12 @@ int CTaskList::writeTaskLogFile(CTask logTask) {
     if (!this->isFileLog)
         return 1;
     FILE* pFile = fopen(this->fileName.c_str(), "a+");
+    // printf("WRITE LOG FILE: %s \n",logTask.getDataToFile().c_str());
+    // fflush(stdout);
     try{
         if (pFile!=NULL){
             fprintf(pFile, "%s \n",logTask.getDataToFile().c_str());
+            fflush(stdout);
             fclose (pFile);
         }
     }catch(...){
@@ -110,11 +118,14 @@ int CTaskList::writeFileTask(){
         if (pFile!=NULL){
             // if (!this->isFileLog){
             fprintf(pFile, "%s \n",CTASK_GUARD);
+            fflush(stdout);
             fprintf(pFile, "%s \n",CTASK_HEADER);
+            fflush(stdout);
             // }
             for (unsigned int i = 0; i < this->listOfTasks.size(); i++){
                 strData = this->listOfTasks[i].getDataToFile();
                 fprintf(pFile, "%s \n",strData.c_str());
+                fflush(stdout);
             }
         }
         fclose (pFile);
@@ -182,7 +193,7 @@ bool CTaskList::moveTasks(unsigned int idx, unsigned int nPos){
     if ((idx < (this->listOfTasks.size()-1)) && (nPos > 0)){
         CTask tTask;
         try{
-            for (int i = 0; i < nPos; i++){
+            for (unsigned int i = 0; i < nPos; i++){
                 tTask = this->listOfTasks[idx+i+1];
                 this->listOfTasks[idx+i+1] = this->listOfTasks[idx+i];
                 this->listOfTasks[idx+i] = tTask;

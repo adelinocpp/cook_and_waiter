@@ -17,9 +17,11 @@ std::string executeShellCommand(const char* cmd){
     char buffer[128];
     std::string result = "";
     FILE* pipe = popen(cmd, "r");
-    if (!pipe) 
+    if (!pipe){
         //throw std::runtime_error("popen() failed!");
         printf("# [%s]: Falha ao chamar o comando popen()!\n",timeStamp());
+        fflush(stdout);
+    }
     try {
         while (!feof(pipe)) {
             if (fgets(buffer, 128, pipe) != NULL)
@@ -38,11 +40,19 @@ std::string executeShellCommand(const char* cmd){
 };
 //-----------------------------------------------------------------------------
 bool checkCommand(std::string strComm){
+    printf("strComm: %s\n",strComm.c_str());
     std::string token = strComm.substr(0, strComm.find("|"));
     token = token.substr(0, token.find("&"));
-    return ((token.find(COMMAND_AUTH) != std::string::npos) &&
-            (token.find("python3") != std::string::npos)) || 
-            (token.find("stress") != std::string::npos);
+    // printf("token.c_str() %s",token.c_str());
+    // printf("token.find(python3) %lu\n",token.find("python3"));
+    // printf("Check 1 %d\n",token.find(COMMAND_AUTH) != std::string::npos);
+    // printf("Check 2 %d\n",token.find("python3") != std::string::npos);
+    // printf("token.find(python3) %lu\n",token.find("python3"));
+    return ((token.find("python3") != std::string::npos) || 
+            (token.find("stress") != std::string::npos) );
+    // return ((token.find(COMMAND_AUTH) != std::string::npos) &&
+    //         (token.find("python3") != std::string::npos)) || 
+    //         (token.find("stress") != std::string::npos);
 };
 //-----------------------------------------------------------------------------
 int executeShellCommandPid(const char* cmd){
@@ -63,12 +73,14 @@ int executeShellCommandPid(const char* cmd){
         std::string currentTime(buffer); 
         std::hash<std::string> hasher;
         std::string fileName = std::to_string(hasher(localCommand+currentTime)); 
-
         localCommand = localCommand + " & echo $! | grep -w -o -E '[0-9]*'>" + fileName + ".pid";
+        // printf("localCommand 1: %s\n",localCommand.c_str());
         system(localCommand.c_str());
         localCommand = "cat " + fileName + ".pid";
         int pid = stoi(executeShellCommand(localCommand.c_str()));
+        // printf("Process ID: %d.\n",pid);
         localCommand = "rm -rf " + fileName + ".pid";
+        // printf("localCommand 2: %s\n",localCommand.c_str());
         system(localCommand.c_str());
         return pid;
     }
@@ -91,13 +103,16 @@ std::vector<int> getListPid() {
     char path[256 + 5 + 5]; // d_name + /proc + /stat
     int pid;
     std::vector<int> vecPID;
+    std::mutex num_mutex;
     vecPID.clear();
     procdir = opendir("/proc");
     if (!procdir) {
         printf("# [%s]: Comando opendir falhou.\n",timeStamp());
+        fflush(stdout);
         return vecPID;
     }
     // Iterate through all files and directories of /proc.
+    num_mutex.lock(); 
     while ((entry = readdir(procdir))) {
         if (!is_pid_dir(entry))
             continue;
@@ -106,12 +121,14 @@ std::vector<int> getListPid() {
         fp = fopen(path, "r");
         if (!fp) {
             printf("# [%s]: Falha ao abrir diretório %s.\n",timeStamp(),path);
+            fflush(stdout);
             continue;
         }
         fscanf(fp, "%d ",&pid);
         vecPID.push_back(pid);
         fclose(fp);
     }
+    num_mutex.unlock(); 
     closedir(procdir);
     return vecPID;
 };

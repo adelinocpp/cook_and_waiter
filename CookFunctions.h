@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <chrono>
 #include <sys/time.h>
+#include <mutex>
 
 #define LOAD_BASE  5 //  milliseconds
 #define LOAD_TIME_MEAN  40 //  milliseconds
