@@ -32,6 +32,33 @@ int checkTaskFile(char * filename){
     }
 }
 //-----------------------------------------------------------------------------
+bool CTaskList::loadFileTask(){
+    CTask readTask;
+    int taskRead;
+    FILE* fp = fopen(this->fileName.c_str(), "r");
+    try{
+        if (fp == NULL)
+            return false;
+        char* line = NULL;
+        size_t len = 0;
+        while ((getline(&line, &len, fp)) != -1) {
+            taskRead = readTask.readFileLine(line);
+            if (taskRead == 1)
+                continue;
+            else
+                this->listOfTasks.push_back(readTask);
+        }
+        fclose(fp);
+        if (line)
+            free(line);
+        return true;
+    } catch(...){
+        if (fp != NULL)
+            fclose(fp);
+        return false;
+    }
+}
+//-----------------------------------------------------------------------------
 bool CTaskList::readFileTask(std::string filename, bool isLog){
     CTask readTask;
     int taskRead;

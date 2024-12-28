@@ -30,8 +30,6 @@
 #include <time.h>
 #include "jsoncpp/json/json.h"
 
-// #define ORDER_FILE "/var/www/cook_and_waiter/cook_order.txt"
-// #define ORDER_FILE_LOG "/var/www/cook_and_waiter/cook_order_log.txt"
 #define ORDER_FILE "cook_order.txt"
 #define ORDER_FILE_LOG "cook_order_log.txt"
 #define PORT 12142
@@ -51,7 +49,54 @@ CTaskList logListOfTasks;
 vector<int> PIDs;
 std::mutex g_num_mutex;
 
-
+//-----------------------------------------------------------------------------
+std::string getFirstCall(){
+    Json::Value response;
+    Json::StreamWriterBuilder builder;
+    std::string json_file;
+    printf("# [%s]: Primeira Mensagem.\n",timeStamp());
+    fflush(stdout);
+    response["mensagem"] = "Comando não executado";
+    json_file= Json::writeString(builder, response);
+    return json_file; 
+}
+//-----------------------------------------------------------------------------
+std::string getListOfTasks(string buffer,bool finish=false){
+    Json::Value body, response;
+    Json::CharReaderBuilder builderJSON;
+    const std::unique_ptr<Json::CharReader> reader(builderJSON.newCharReader());
+    std::string rawJson;
+    JSONCPP_STRING err;
+    int posLeftBlacket = buffer.find("{") ;
+    int posRightBlacket = buffer.find("}");
+    bool jsonOK;
+    int rawJsonLength;
+    Json::StreamWriterBuilder builder;
+    std::string json_file;
+    printf("# [%s]: Solicita lista de tarefas.\n",timeStamp());
+    fflush(stdout);
+    // --- TODO: encapsular estas 3 linhas
+    rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
+    rawJsonLength = static_cast<int>(rawJson.length());
+    jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
+    // --- TODO: encapsular o tratamento 
+    if (jsonOK){
+        if (finish){
+            if(logListOfTasks.loadFileTask()){
+                response["lista"] = logListOfTasks.getListOfTask();
+                logListOfTasks.freeMemoryFileTask();
+            } else
+                response["mensagem"] = "Falha ao carregar lista de taefas executada";
+        }
+        else
+            response["lista"] = listOfTasks.getListOfTask();
+    }else{
+        printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+        fflush(stdout);
+    }
+    json_file = Json::writeString(builder, response);
+    return json_file;
+};
 // ----------------------------------------------------------------------------
 // --- Funcao para resolver as mensagens aceitas pelo servidor
 // --- Funcao muito repetitiva, precisa melhorar
@@ -63,7 +108,8 @@ std::mutex g_num_mutex;
 //      POST: e.g.  http://127.0.0.1:12142/postpone (not ready)
 string solveMessage(string buffer){
     bool getFirst = buffer.find("GET /?command=") != -1;
-    bool getListOfTasks = buffer.find("GET /list_tasks HTTP/1.1") != -1;
+    bool callGetListOfTasks = buffer.find("GET /list_tasks HTTP/1.1") != -1;
+    bool callGetListOfFinishTasks = buffer.find("GET /list_finish_tasks HTTP/1.1") != -1;
     bool postQueue = buffer.find("POST /queue HTTP/1.1") != -1;
     bool postDequeue = buffer.find("POST /dequeue HTTP/1.1") != -1;
     bool postPostpone = buffer.find("POST /postpone HTTP/1.1") != -1;
@@ -83,27 +129,31 @@ string solveMessage(string buffer){
     // TODO: Implementar as demais requisições
     // TODO: modo verbose
     if (getFirst){
-        printf("# [%s]: Primeira Mensagem.\n",timeStamp());
-        fflush(stdout);
-        response["mensagem"] = "Comando não executado";
-        json_file = Json::writeString(builder, response);
-    } else if (getListOfTasks && hasBody){
-        printf("# [%s]: Solicita lista de tarefas.\n",timeStamp());
-        fflush(stdout);
-        // --- TODO: encapsular estas 3 linhas
-        rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
-        rawJsonLength = static_cast<int>(rawJson.length());
-        jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
-        // --- TODO: encapsular o tratamento 
-        if (jsonOK){
-            response["lista"] = listOfTasks.getListOfTask();
-        }else{
-            printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
-            fflush(stdout);
-        }
-        // --------
-        json_file = Json::writeString(builder, response);
-        return json_file;
+        return getFirstCall();
+        // printf("# [%s]: Primeira Mensagem.\n",timeStamp());
+        // fflush(stdout);
+        // response["mensagem"] = "Comando não executado";
+        // json_file = Json::writeString(builder, response);
+    } else if (callGetListOfTasks && hasBody){
+        return getListOfTasks(buffer);
+        // printf("# [%s]: Solicita lista de tarefas.\n",timeStamp());
+        // fflush(stdout);
+        // // --- TODO: encapsular estas 3 linhas
+        // rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
+        // rawJsonLength = static_cast<int>(rawJson.length());
+        // jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
+        // // --- TODO: encapsular o tratamento 
+        // if (jsonOK){
+        //     response["lista"] = listOfTasks.getListOfTask();
+        // }else{
+        //     printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+        //     fflush(stdout);
+        // }
+        // json_file = Json::writeString(builder, response);
+        // // --------
+        // return json_file;
+    } else if (callGetListOfFinishTasks && hasBody){
+        return getListOfTasks(buffer,true);
     } else if (postQueue && hasBody){
         printf("# [%s]: Adiciona an fila.\n",timeStamp());
         fflush(stdout);
@@ -358,12 +408,8 @@ int main(int argc, char* argv[]) {
             isIdle && (listOfTasks.size() > 0)){
             // --- INÍCIO: Seção crítica
             g_num_mutex.lock(); 
-            // printf("Mutex lock.\n");
             tTask = listOfTasks[0];
-            
             PIDrunning = executeShellCommandPid(tTask.getCommand().c_str());
-            // printf("Executando Comando: %s",tTask.getCommand().c_str());
-            // printf("Executando Comando PID: %d",PIDrunning);
             if (PIDrunning > 0){
                 // Executando com sucesso
                 isIdle = false;
@@ -383,24 +429,15 @@ int main(int argc, char* argv[]) {
                 tTask.setError("Falha de execução");
                 listOfTasks.dequeueTasks(0);
                 listOfTasks.writeFileTask();
-                // printf("# [%s]: Inicio escreve LOG.\n",timeStamp());
-                // fflush(stdout);
                 logListOfTasks.writeTaskLogFile(tTask);
-                // printf("# [%s]: Fim escreve LOG.\n",timeStamp());
-                // fflush(stdout);
-                // logListOfTasks.queueTask(tTask);
-                // logListOfTasks.writeFileTask();
                 isIdle = true;
             }
             // --- FIM: Seção crítica
             g_num_mutex.unlock();
-            // printf("Mutex unlock.\n");
         }
         else{
-            // printf("# [%s]: Sleeping 5000 ms.\n",timeStamp());
             std::this_thread::sleep_until(system_clock::now() + milliseconds(50));
         }
     }
-    // printf("Sleeping 5000 ms.\n");
     return 0;
 }

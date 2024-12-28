@@ -24,6 +24,7 @@ class CTaskList{
             };
         inline ~CTaskList(){listOfTasks.clear();};
         bool readFileTask(std::string filename, bool isLog=false);
+        bool loadFileTask();
         inline int freeMemoryFileTask(){
             if (this->isFileLog){
                 this->listOfTasks.clear();
