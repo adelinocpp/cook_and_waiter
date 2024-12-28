@@ -50,11 +50,23 @@ vector<int> PIDs;
 std::mutex g_num_mutex;
 
 //-----------------------------------------------------------------------------
-std::string getFirstCall(){
+bool checkBodyJson(string buffer, JSONCPP_STRING& err,Json::Value& body){
+    std::string rawJson;
+    Json::CharReaderBuilder builderJSON;
+    const std::unique_ptr<Json::CharReader> reader(builderJSON.newCharReader());
+    int posLeftBlacket = buffer.find("{") ;
+    int posRightBlacket = buffer.find("}");
+    int rawJsonLength;
+    rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
+    rawJsonLength = static_cast<int>(rawJson.length());
+    return reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
+}
+//-----------------------------------------------------------------------------
+std::string getFirstCall(string srtMessage="Primeira Mensagem"){
     Json::Value response;
     Json::StreamWriterBuilder builder;
     std::string json_file;
-    printf("# [%s]: Primeira Mensagem.\n",timeStamp());
+    printf("# [%s]: %s.\n",timeStamp(),srtMessage.c_str());
     fflush(stdout);
     response["mensagem"] = "Comando não executado";
     json_file= Json::writeString(builder, response);
@@ -62,25 +74,15 @@ std::string getFirstCall(){
 }
 //-----------------------------------------------------------------------------
 std::string getListOfTasks(string buffer,bool finish=false){
-    Json::Value body, response;
+    Json::Value body,response;
     Json::CharReaderBuilder builderJSON;
-    const std::unique_ptr<Json::CharReader> reader(builderJSON.newCharReader());
-    std::string rawJson;
     JSONCPP_STRING err;
-    int posLeftBlacket = buffer.find("{") ;
-    int posRightBlacket = buffer.find("}");
-    bool jsonOK;
-    int rawJsonLength;
     Json::StreamWriterBuilder builder;
     std::string json_file;
     printf("# [%s]: Solicita lista de tarefas.\n",timeStamp());
     fflush(stdout);
-    // --- TODO: encapsular estas 3 linhas
-    rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
-    rawJsonLength = static_cast<int>(rawJson.length());
-    jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
     // --- TODO: encapsular o tratamento 
-    if (jsonOK){
+    if (checkBodyJson(buffer,err,body)){
         if (finish){
             if(logListOfTasks.loadFileTask()){
                 response["lista"] = logListOfTasks.getListOfTask();
@@ -97,6 +99,36 @@ std::string getListOfTasks(string buffer,bool finish=false){
     json_file = Json::writeString(builder, response);
     return json_file;
 };
+//-----------------------------------------------------------------------------
+std::string postQueue(string buffer){
+    Json::Value body, response;
+    JSONCPP_STRING err;
+    Json::StreamWriterBuilder builder;
+    std::string json_file;
+    printf("# [%s]: Adiciona an fila.\n",timeStamp());
+    fflush(stdout);
+    if (checkBodyJson(buffer,err,body)){
+        if (body["token"] == COMMAND_AUTH){
+            CTask recieveTask;
+            recieveTask.setCommand(body["command"].asString());
+            recieveTask.setTag(body["tag"].asString());
+            recieveTask.setSchedTime(timeStamp());
+            listOfTasks.queueTask(recieveTask);
+            if (listOfTasks.writeFileTask() == 0){
+                response["mensagem"] = "Comando executado";
+                response["uuid"] = recieveTask.getUUID();
+            }
+        } else{
+            response["mensagem"] = "Comando não executado";
+        }
+    } else{
+        printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+        fflush(stdout);
+    }
+    // --------
+    json_file = Json::writeString(builder, response);
+    return json_file;
+}
 // ----------------------------------------------------------------------------
 // --- Funcao para resolver as mensagens aceitas pelo servidor
 // --- Funcao muito repetitiva, precisa melhorar
@@ -110,97 +142,27 @@ string solveMessage(string buffer){
     bool getFirst = buffer.find("GET /?command=") != -1;
     bool callGetListOfTasks = buffer.find("GET /list_tasks HTTP/1.1") != -1;
     bool callGetListOfFinishTasks = buffer.find("GET /list_finish_tasks HTTP/1.1") != -1;
-    bool postQueue = buffer.find("POST /queue HTTP/1.1") != -1;
+    bool callPostQueue = buffer.find("POST /queue HTTP/1.1") != -1;
     bool postDequeue = buffer.find("POST /dequeue HTTP/1.1") != -1;
     bool postPostpone = buffer.find("POST /postpone HTTP/1.1") != -1;
-    int posLeftBlacket = buffer.find("{") ;
-    int posRightBlacket = buffer.find("}");
-    bool hasBody  = ((posLeftBlacket != -1) && (posRightBlacket != -1));
-
-    Json::Value body, response;
-    Json::CharReaderBuilder builderJSON;
-    const std::unique_ptr<Json::CharReader> reader(builderJSON.newCharReader());
-    std::string rawJson;
-    JSONCPP_STRING err;
-    bool jsonOK;
-    int rawJsonLength;
-    Json::StreamWriterBuilder builder;
+    bool hasBody  = ((buffer.find("{") != -1) && (buffer.find("}") != -1));
     std::string json_file;
     // TODO: Implementar as demais requisições
     // TODO: modo verbose
     if (getFirst){
         return getFirstCall();
-        // printf("# [%s]: Primeira Mensagem.\n",timeStamp());
-        // fflush(stdout);
-        // response["mensagem"] = "Comando não executado";
-        // json_file = Json::writeString(builder, response);
     } else if (callGetListOfTasks && hasBody){
         return getListOfTasks(buffer);
-        // printf("# [%s]: Solicita lista de tarefas.\n",timeStamp());
-        // fflush(stdout);
-        // // --- TODO: encapsular estas 3 linhas
-        // rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
-        // rawJsonLength = static_cast<int>(rawJson.length());
-        // jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
-        // // --- TODO: encapsular o tratamento 
-        // if (jsonOK){
-        //     response["lista"] = listOfTasks.getListOfTask();
-        // }else{
-        //     printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
-        //     fflush(stdout);
-        // }
-        // json_file = Json::writeString(builder, response);
-        // // --------
-        // return json_file;
     } else if (callGetListOfFinishTasks && hasBody){
         return getListOfTasks(buffer,true);
-    } else if (postQueue && hasBody){
-        printf("# [%s]: Adiciona an fila.\n",timeStamp());
-        fflush(stdout);
-        // --- TODO: encapsular estas 3 linhas
-        rawJson = buffer.substr(posLeftBlacket,posRightBlacket-posLeftBlacket+1);
-        rawJsonLength = static_cast<int>(rawJson.length());
-        jsonOK = reader->parse(rawJson.c_str(), rawJson.c_str() + rawJsonLength, &body, &err);
-        // --- TODO: encapsular o tratamento 
-        // g_num_mutex.lock();
-        if (jsonOK){
-            if (body["token"] == COMMAND_AUTH){
-                CTask recieveTask;
-                
-                recieveTask.setCommand(body["command"].asString());
-                recieveTask.setTag(body["tag"].asString());
-                recieveTask.setSchedTime(timeStamp());
-                listOfTasks.queueTask(recieveTask);
-                if (listOfTasks.writeFileTask() == 0){
-                    response["mensagem"] = "Comando executado";
-                    response["uuid"] = recieveTask.getUUID();
-                }
-                
-            } else{
-                response["mensagem"] = "Comando não executado";
-            }
-        
-        } else{
-            printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
-            fflush(stdout);
-        }
-        // g_num_mutex.unlock();
-        // --------
-        json_file = Json::writeString(builder, response);
-        return json_file;
+    } else if (callPostQueue && hasBody){
+        return postQueue(buffer);
     } else if (postDequeue && hasBody){
-        printf("# [%s]: Remove da fila.\n",timeStamp());
-        fflush(stdout);
-        response["mensagem"] = "Comando não executado";
-        json_file = Json::writeString(builder, response);
+        return getFirstCall("Remove da fila");
     } else if (postPostpone && hasBody){
-        printf("# [%s]: Adia na fila.\n",timeStamp());
-        fflush(stdout);
-        response["mensagem"] = "Comando não executado";
-        json_file = Json::writeString(builder, response);
+        return getFirstCall("Adia na fila");
     } else{
-        response["mensagem"] = "Comando não executado";
-        json_file = Json::writeString(builder, response);
+        return getFirstCall("Comando não existe");
     }
     return json_file;
 }
