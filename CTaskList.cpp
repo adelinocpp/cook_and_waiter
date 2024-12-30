@@ -164,17 +164,28 @@ int CTaskList::writeFileTask(){
     return returnValue;
 }
 //-----------------------------------------------------------------------------
-int getIdxByTag(std::string tag, bool mfirst){
+int getIdxByTag(std::string tag, bool mfirst=true){
     // TODO: implement this function
     // Return de index(s) of task on vector by tag
     int returnValue = -1;
     return returnValue;
 };
 //-----------------------------------------------------------------------------
-int CTaskList::getIdxByUUID(std::string uuid){
-    // TODO: implement this function
-    // Return de index of task on vector by UUID
-    int returnValue = -1;
+CTask CTaskList::getTaskByUUID(std::string uuid){
+    CTask returnValue, baseValue;
+    bool loadFile = false;
+    if (this->isFileLog)
+        loadFile = this->loadFileTask();
+    if (loadFile || !this->isFileLog)
+        for(unsigned int i = 0; i < this->listOfTasks.size(); i++){
+            baseValue = listOfTasks[i];
+            if (uuid.compare(baseValue.getUUID()) == 0){
+                returnValue = baseValue;
+                break;
+            }
+        }
+    if (this->isFileLog)
+        loadFile = this->freeMemoryFileTask();
     return returnValue;
 };
 //-----------------------------------------------------------------------------

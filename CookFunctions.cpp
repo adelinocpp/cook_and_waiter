@@ -14,7 +14,7 @@ char* timeStamp(){
 }
 //-----------------------------------------------------------------------------
 std::string executeShellCommand(const char* cmd){
-    char buffer[128];
+    char buffer[256];
     std::string result = "";
     FILE* pipe = popen(cmd, "r");
     if (!pipe){
@@ -66,7 +66,7 @@ int executeShellCommandPid(const char* cmd){
     else{
         time_t rawtime;
         struct tm * timeinfo;
-        char buffer[80];    
+        char buffer[256];    
         time (&rawtime);
         timeinfo = localtime(&rawtime); 
         strftime(buffer,sizeof(buffer),"%d-%m-%Y %I:%M:%S",timeinfo);

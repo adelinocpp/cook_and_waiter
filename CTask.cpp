@@ -17,6 +17,26 @@ std::string get_uuid() {
     return res;
 }
 // ----------------------------------------------------------------------------
+std::string CTask::translate_status()
+{
+    /*
+    #define CTASK_WAITING 120420
+    #define CTASK_RUNNING 120421
+    #define CTASK_FINISH  120422
+    #define CTASK_FAIL    120423
+    */
+    if (this->status == CTASK_WAITING){
+        return "WAITING";
+    } else if (this->status == CTASK_RUNNING){
+        return "RUNNING";
+    } else if (this->status == CTASK_FINISH){
+        return "FINISH";
+    } else if (this->status == CTASK_FAIL){
+        return "FAIL";
+    }
+    return "UNDEFINED"; 
+};
+// ----------------------------------------------------------------------------
 int CTask::readFileLine(char * fileLine){
     std::string s = fileLine;
     int returnValue = 1;
@@ -26,11 +46,8 @@ int CTask::readFileLine(char * fileLine){
         if (firstChar == '#')
             return returnValue;
         else{
-            // printf("CTask: %s",s.c_str());
-            // printf("CTask: %ld.\n",boost::count(s,'\t'));
             if (!(boost::count(s,'\t') == 9))
                 return returnValue;
-            
             // char uuid[1024], tag[1024], schedT[1024], initT[1024], endT[1024], comm[1024], errorM[1024];
             std::string uuid, tag, schedT, initT, endT, comm, errorM;
             unsigned int status;
@@ -65,14 +82,6 @@ int CTask::readFileLine(char * fileLine){
             s = s.substr(FimIdx+1);
             FimIdx = s.find('\n');
             errorM = s.substr(0,FimIdx);
-            // sscanf(s.c_str(), "%s;%s;%u;%d;%s;%s;%s;%s;%d;%s\n", uuid, 
-            //     tag,&status,&queueP,schedT, initT,endT,comm,&pid,
-            //     errorM);
-
-
-            // printf("%s\t%s\t%u\t%d\t%s\t%s\t%s\t%s\t%d\t%s\n", uuid.c_str(), 
-            //     tag.c_str(),status,queueP,schedT.c_str(), initT.c_str(),
-            //     endT.c_str(),comm.c_str(),pid,errorM.c_str());
             this->UUID = uuid;
             this->tag = tag;
             this->status = status;
@@ -84,16 +93,14 @@ int CTask::readFileLine(char * fileLine){
             this->pid = pid;
             this->errorMessage = errorM;
             returnValue = 0;
-            // printf("Leu....\n");
-            return 0;
+            return returnValue;
         }
     }
-    // printf("return....\n");
     return returnValue;
 };
 // ----------------------------------------------------------------------------
 std::string CTask::getDataToFile(){
-    char buffer[4096];
+    char buffer[8192];
     sprintf(buffer, "%s\t%s\t%u\t%d\t%s\t%s\t%s\t%s\t%d\t%s\n", this->UUID.c_str(),
     this->tag.c_str(),this->status,this->queuePosition,this->schedTime.c_str(),
     this->initTime.c_str(),this->endTime.c_str(),this->command.c_str(),this->pid,
@@ -104,11 +111,11 @@ std::string CTask::getDataToFile(){
 }
 // ----------------------------------------------------------------------------
 std::string  CTask::getDataAsJSON(){    
-    char buffer[4096];
-    sprintf(buffer,"{'uuid':'%s', 'tag': '%s','status':%u,'position':%d,"
+    char buffer[8192];
+    sprintf(buffer,"{'uuid':'%s', 'tag': '%s','status':%s,'position':%d,"
     "'sched at':'%s','init at':'%s','end at':'%s','command':'%s','pid':%d,"
     "'error':'%s'}",
-    this->UUID.c_str(), this->tag.c_str(),this->status,this->queuePosition,
+    this->UUID.c_str(), this->tag.c_str(),this->translate_status().c_str(),this->queuePosition,
     this->schedTime.c_str(),this->initTime.c_str(),this->endTime.c_str(),
     this->command.c_str(),this->pid,this->errorMessage.c_str());
     std::string returnStr = buffer;

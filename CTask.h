@@ -63,6 +63,7 @@ class CTask{
         inline void setError(std::string newError){this->errorMessage = newError;};
         inline void setCommand(std::string newCommand){this->command = newCommand;};
         inline void setTag(std::string newTag){this->tag = newTag;};
+        std::string translate_status();
 };
 
 #endif // CTASK_H

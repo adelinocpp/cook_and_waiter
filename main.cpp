@@ -81,17 +81,19 @@ std::string getListOfTasks(string buffer,bool finish=false){
     std::string json_file;
     printf("# [%s]: Solicita lista de tarefas.\n",timeStamp());
     fflush(stdout);
-    // --- TODO: encapsular o tratamento 
     if (checkBodyJson(buffer,err,body)){
         if (finish){
             if(logListOfTasks.loadFileTask()){
                 response["lista"] = logListOfTasks.getListOfTask();
+                response["mensagem"] = "Lista de tarefas já executadas.";
                 logListOfTasks.freeMemoryFileTask();
             } else
-                response["mensagem"] = "Falha ao carregar lista de taefas executada";
+                response["mensagem"] = "Falha ao carregar lista de tarefas executadas.";
         }
-        else
+        else{
             response["lista"] = listOfTasks.getListOfTask();
+            response["mensagem"] = "Lista de tarefas em execução.";
+        }
     }else{
         printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
         fflush(stdout);
@@ -130,6 +132,36 @@ std::string postQueue(string buffer){
     return json_file;
 }
 // ----------------------------------------------------------------------------
+std::string getTasksByID(string buffer){
+    Json::Value body, response;
+    Json::CharReaderBuilder builderJSON;
+    JSONCPP_STRING err;
+    Json::StreamWriterBuilder builder;
+    std::string json_file;
+    printf("# [%s]: Solicita tarefa por UUID.\n",timeStamp());
+    fflush(stdout);
+    if (checkBodyJson(buffer,err,body)){
+        CTask findTask;
+        std::string sendUUID = body["uuid"].asCString();
+        // --- Try on List of Tasks
+        findTask = listOfTasks.getTaskByUUID(sendUUID);
+        // --- Try on LOG List of Tasks
+        if(findTask.getCommand().compare("-") == 0)
+            findTask = logListOfTasks.getTaskByUUID(sendUUID);
+        if(findTask.getCommand().compare("-") == 0)
+            response["tarefa"] = "{}";
+        else{
+            response["tarefa"] = findTask.getDataAsJSON();
+            response["messagem"] = "Tarefa não existe na lista de solicitações.";
+        }
+    }else{
+        printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+        fflush(stdout);
+    }
+    json_file = Json::writeString(builder, response);
+    return json_file;
+}
+// ----------------------------------------------------------------------------
 // --- Funcao para resolver as mensagens aceitas pelo servidor
 // --- Funcao muito repetitiva, precisa melhorar
 // --- Requisições:
@@ -142,6 +174,7 @@ string solveMessage(string buffer){
     bool getFirst = buffer.find("GET /?command=") != -1;
     bool callGetListOfTasks = buffer.find("GET /list_tasks HTTP/1.1") != -1;
     bool callGetListOfFinishTasks = buffer.find("GET /list_finish_tasks HTTP/1.1") != -1;
+    bool callGetTasksByID = buffer.find("GET /get_task_by_id HTTP/1.1") != -1;
     bool callPostQueue = buffer.find("POST /queue HTTP/1.1") != -1;
     bool postDequeue = buffer.find("POST /dequeue HTTP/1.1") != -1;
     bool postPostpone = buffer.find("POST /postpone HTTP/1.1") != -1;
@@ -155,6 +188,8 @@ string solveMessage(string buffer){
         return getListOfTasks(buffer);
     } else if (callGetListOfFinishTasks && hasBody){
         return getListOfTasks(buffer,true);
+    } else if (callGetTasksByID && hasBody){
+        return getTasksByID(buffer);
     } else if (callPostQueue && hasBody){
         return postQueue(buffer);
     } else if (postDequeue && hasBody){
@@ -208,11 +243,7 @@ void *getRunParam(void*){
             tTask.setPosition(-1);
             listOfTasks.dequeueTasks(0);
             listOfTasks.writeFileTask();
-            // printf("# [%s]: Inicio escreve LOG.\n",timeStamp());
-            // fflush(stdout);
             logListOfTasks.writeTaskLogFile(tTask);
-            // printf("# [%s]: Fim escreve LOG.\n",timeStamp());
-            // fflush(stdout);
             PIDrunning = -1;
             isIdle = true;
             // --- FIM: Seção crítica
@@ -227,7 +258,7 @@ void *getListenParam(void*){
     int opt = true;  
     int main_socket , addrlen , new_socket;   
     struct sockaddr_in address; 
-    char buffer[1025];  
+    char buffer[1024];  
     std::string jsonMessage;
     // Criação do socket principal
     if( (main_socket = socket(AF_INET , SOCK_STREAM , 0)) == 0) {  
