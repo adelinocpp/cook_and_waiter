@@ -121,8 +121,6 @@ int CTaskList::writeTaskLogFile(CTask logTask) {
     if (!this->isFileLog)
         return 1;
     FILE* pFile = fopen(this->fileName.c_str(), "a+");
-    // printf("WRITE LOG FILE: %s \n",logTask.getDataToFile().c_str());
-    // fflush(stdout);
     try{
         if (pFile!=NULL){
             fprintf(pFile, "%s \n",logTask.getDataToFile().c_str());
@@ -171,7 +169,7 @@ int getIdxByTag(std::string tag, bool mfirst=true){
     return returnValue;
 };
 //-----------------------------------------------------------------------------
-CTask CTaskList::getTaskByUUID(std::string uuid){
+CTask CTaskList::getTaskByUUID(std::string uuid, unsigned int& idx){
     CTask returnValue, baseValue;
     bool loadFile = false;
     if (this->isFileLog)
@@ -181,6 +179,7 @@ CTask CTaskList::getTaskByUUID(std::string uuid){
             baseValue = listOfTasks[i];
             if (uuid.compare(baseValue.getUUID()) == 0){
                 returnValue = baseValue;
+                idx = i;
                 break;
             }
         }

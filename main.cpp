@@ -47,7 +47,7 @@ bool isIdle = true;
 CTaskList listOfTasks;
 CTaskList logListOfTasks;
 vector<int> PIDs;
-std::mutex g_num_mutex;
+std::mutex g_num_mutex, set_error_mutex;
 
 //-----------------------------------------------------------------------------
 bool checkBodyJson(string buffer, JSONCPP_STRING& err,Json::Value& body){
@@ -142,12 +142,13 @@ std::string getTasksByID(string buffer){
     fflush(stdout);
     if (checkBodyJson(buffer,err,body)){
         CTask findTask;
+        unsigned int idx;
         std::string sendUUID = body["uuid"].asCString();
         // --- Try on List of Tasks
-        findTask = listOfTasks.getTaskByUUID(sendUUID);
+        findTask = listOfTasks.getTaskByUUID(sendUUID,idx);
         // --- Try on LOG List of Tasks
         if(findTask.getCommand().compare("-") == 0)
-            findTask = logListOfTasks.getTaskByUUID(sendUUID);
+            findTask = logListOfTasks.getTaskByUUID(sendUUID,idx);
         if(findTask.getCommand().compare("-") == 0)
             response["tarefa"] = "{}";
         else{
@@ -156,6 +157,33 @@ std::string getTasksByID(string buffer){
         }
     }else{
         printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+        fflush(stdout);
+    }
+    json_file = Json::writeString(builder, response);
+    return json_file;
+}
+// ----------------------------------------------------------------------------
+std::string setErrorTasksByID(string buffer){
+    Json::Value body, response;
+    Json::CharReaderBuilder builderJSON;
+    JSONCPP_STRING err;
+    Json::StreamWriterBuilder builder;
+    std::string json_file;
+    printf("# [%s]: Seta mensagem de erro por UUID.\n",timeStamp());
+    fflush(stdout);
+    if (checkBodyJson(buffer,err,body)){
+        CTask findTask;
+        std::string sendUUID = body["uuid"].asCString();
+        unsigned int idx;
+        set_error_mutex.lock(); 
+        findTask = listOfTasks.getTaskByUUID(sendUUID,idx);
+        findTask.setError(body["error"].asCString());
+        listOfTasks.setTask(findTask,idx);
+        set_error_mutex.unlock(); 
+        response["sucess"] = "1";
+    } else{
+        printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
+        response["sucess"] = "0";
         fflush(stdout);
     }
     json_file = Json::writeString(builder, response);
@@ -175,6 +203,7 @@ string solveMessage(string buffer){
     bool callGetListOfTasks = buffer.find("GET /list_tasks HTTP/1.1") != -1;
     bool callGetListOfFinishTasks = buffer.find("GET /list_finish_tasks HTTP/1.1") != -1;
     bool callGetTasksByID = buffer.find("GET /get_task_by_id HTTP/1.1") != -1;
+    bool callSetErrorTasksByID = buffer.find("GET /set_error_task_by_id HTTP/1.1") != -1;
     bool callPostQueue = buffer.find("POST /queue HTTP/1.1") != -1;
     bool postDequeue = buffer.find("POST /dequeue HTTP/1.1") != -1;
     bool postPostpone = buffer.find("POST /postpone HTTP/1.1") != -1;
@@ -190,6 +219,8 @@ string solveMessage(string buffer){
         return getListOfTasks(buffer,true);
     } else if (callGetTasksByID && hasBody){
         return getTasksByID(buffer);
+    } else if (callSetErrorTasksByID && hasBody){
+        return setErrorTasksByID(buffer);
     } else if (callPostQueue && hasBody){
         return postQueue(buffer);
     } else if (postDequeue && hasBody){

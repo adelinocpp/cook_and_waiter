@@ -18,8 +18,7 @@ std::string get_uuid() {
 }
 // ----------------------------------------------------------------------------
 std::string CTask::translate_status()
-{
-    /*
+{    /*
     #define CTASK_WAITING 120420
     #define CTASK_RUNNING 120421
     #define CTASK_FINISH  120422
