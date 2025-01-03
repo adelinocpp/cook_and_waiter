@@ -169,7 +169,7 @@ int getIdxByTag(std::string tag, bool mfirst=true){
     return returnValue;
 };
 //-----------------------------------------------------------------------------
-CTask CTaskList::getTaskByUUID(std::string uuid, unsigned int& idx){
+CTask CTaskList::getTaskByUUID(std::string uuid, int& idx){
     CTask returnValue, baseValue;
     bool loadFile = false;
     if (this->isFileLog)

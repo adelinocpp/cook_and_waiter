@@ -37,7 +37,7 @@ class CTaskList{
         int writeFileTask();
         int writeTaskLogFile(CTask logTask);
         int getIdxByTag(std::string tag, bool mfirst=true);
-        CTask getTaskByUUID(std::string uuid, unsigned int& idx);
+        CTask getTaskByUUID(std::string uuid, int& idx);
         std::string listTasks();
         bool queueTask(CTask qTask);
         bool dequeueTasks(unsigned int idx=0);
