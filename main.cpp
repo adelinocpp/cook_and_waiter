@@ -175,11 +175,13 @@ std::string setErrorTasksByID(string buffer){
         CTask findTask;
         std::string sendUUID = body["uuid"].asCString();
         unsigned int idx;
+        // --- INÍCIO: Seção crítica
         set_error_mutex.lock(); 
         findTask = listOfTasks.getTaskByUUID(sendUUID,idx);
         findTask.setError(body["error"].asCString());
         listOfTasks.setTask(findTask,idx);
         set_error_mutex.unlock(); 
+        // --- FIM: Seção crítica
         response["sucess"] = "1";
     } else{
         printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
@@ -262,7 +264,6 @@ void *getRunParam(void*){
                     break;
                 }
         }
-       
         if ((PIDrunning > 0) && !cPIDrunning){
             printf("# [%s]: File com PID: %d, running: %d.\n",timeStamp(),PIDrunning,cPIDrunning);
             fflush(stdout);
@@ -329,7 +330,6 @@ void *getListenParam(void*){
         }
         // --- INÍCIO: Seção crítica
         g_num_mutex.lock();
-        // printf("Mutex lock.\n"); 
         bzero(buffer,1024);
         int n = read(new_socket,buffer,1024);
         if (n < 0){ 
@@ -352,7 +352,6 @@ void *getListenParam(void*){
         close(new_socket);
         // --- FIM: Seção crítica
         g_num_mutex.unlock(); 
-        // printf("Mutex unlock.\n");
     }
     pthread_exit(NULL);
 }
@@ -362,8 +361,6 @@ int main(int argc, char* argv[]) {
     bool ckOrderList, ckOrderLog;
     initCpuPercent(lastTotalUser, lastTotalUserLow, 
                             lastTotalSys, lastTotalIdle);
-    
-    // std::string logDir = getenv("LOG_DIR");
     std::string logDir = "/var/www/cook_and_waiter/";
     std::string strOrderFileFullPath = logDir + std::string(ORDER_FILE);
     std::string strOrderFileLogFullPath = logDir + std::string(ORDER_FILE_LOG);
@@ -433,6 +430,7 @@ int main(int argc, char* argv[]) {
             // --- INÍCIO: Seção crítica
             g_num_mutex.lock(); 
             tTask = listOfTasks[0];
+            tTask.appendUuidOnCommand();
             PIDrunning = executeShellCommandPid(tTask.getCommand().c_str());
             if (PIDrunning > 0){
                 // Executando com sucesso

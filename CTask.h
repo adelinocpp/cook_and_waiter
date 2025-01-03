@@ -64,6 +64,10 @@ class CTask{
         inline void setCommand(std::string newCommand){this->command = newCommand;};
         inline void setTag(std::string newTag){this->tag = newTag;};
         std::string translate_status();
+        inline void appendUuidOnCommand(){
+            if (this->command.find("python3") != std::string::npos)
+                this->command = this->command + " " + this->UUID;
+        };
 };
 
 #endif // CTASK_H
