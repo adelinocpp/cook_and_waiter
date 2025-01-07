@@ -7,6 +7,8 @@
 #include <boost/algorithm/string.hpp>
 #include <random>
 
+#include "CookFunctions.h"
+
 // ID - tag - hora agendamento - hora inicio - estatus - posicao - comando - hora fim
 #define CTASK_WAITING 120420
 #define CTASK_RUNNING 120421

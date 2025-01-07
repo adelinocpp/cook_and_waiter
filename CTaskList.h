@@ -45,9 +45,9 @@ class CTaskList{
         inline unsigned int size(){return this->listOfTasks.size();};
         inline CTask operator[](unsigned int idx) {return this->listOfTasks[idx];};
         inline void setTask(CTask newTask, unsigned int idx){
-            if (idx > 0)
+            if (idx >= 0)
                 this->listOfTasks[idx] = newTask;
-            };
+        };
         std::string getListOfTask();
 };
 

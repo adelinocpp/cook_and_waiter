@@ -49,6 +49,11 @@ CTaskList logListOfTasks;
 vector<int> PIDs;
 std::mutex g_num_mutex;
 
+struct solveReqArgStruct {
+    string buffer;
+    bool finish;
+    std::string json_file;
+};
 //-----------------------------------------------------------------------------
 bool checkBodyJson(string buffer, JSONCPP_STRING& err,Json::Value& body){
     std::string rawJson;
@@ -68,13 +73,13 @@ bool checkBodyJson(string buffer, JSONCPP_STRING& err,Json::Value& body){
     }
 }
 //-----------------------------------------------------------------------------
-std::string getFirstCall(string srtMessage="Primeira Mensagem"){
+std::string getFirstCall(string srtMessage=""){
     Json::Value response;
     Json::StreamWriterBuilder builder;
     std::string json_file;
     printf("# [%s]: %s.\n",timeStamp(),srtMessage.c_str());
     fflush(stdout);
-    response["mensagem"] = "Comando não executado";
+    response["mensagem"] = "Chamada de controle. Comando não executado.";
     json_file= Json::writeString(builder, response);
     return json_file; 
 }
@@ -113,7 +118,7 @@ std::string postQueue(string buffer){
     JSONCPP_STRING err;
     Json::StreamWriterBuilder builder;
     std::string json_file;
-    printf("# [%s]: Adiciona an fila.\n",timeStamp());
+    printf("# [%s]: Adiciona na fila.\n",timeStamp());
     fflush(stdout);
     if (checkBodyJson(buffer,err,body)){
         if (body["token"] == COMMAND_AUTH){
@@ -127,7 +132,7 @@ std::string postQueue(string buffer){
                 response["uuid"] = recieveTask.getUUID();
             }
         } else{
-            response["mensagem"] = "Comando não executado";
+            response["mensagem"] = "Falha na verificação do token. Não adicionado na fila. Comando não executado.";
         }
     } else{
         printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
@@ -149,17 +154,24 @@ std::string getTasksByID(string buffer){
     if (checkBodyJson(buffer,err,body)){
         CTask findTask;
         int idx = -1;
+        int idxLog = -1;
         std::string sendUUID = body["uuid"].asCString();
         // --- Try on List of Tasks
         findTask = listOfTasks.getTaskByUUID(sendUUID,idx);
         // --- Try on LOG List of Tasks
         if (idx < 0)
-            findTask = logListOfTasks.getTaskByUUID(sendUUID,idx);
-        if (idx < 0)
-            response["tarefa"] = "{}";
+            findTask = logListOfTasks.getTaskByUUID(sendUUID,idxLog);
         else{
             response["tarefa"] = findTask.getDataAsJSON();
+            response["messagem"] = "Tarefa encontrada.";
+        }
+        if (idxLog < 0){
+            response["tarefa"] = "{}";
             response["messagem"] = "Tarefa não existe na lista de solicitações.";
+        }
+        else{
+            response["tarefa"] = findTask.getDataAsJSON();
+            response["messagem"] = "Tarefa encontrada.";
         }
     }else{
         printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
@@ -178,42 +190,43 @@ std::string setErrorTasksByID(string buffer){
     printf("# [%s]: Seta mensagem de erro por UUID.\n",timeStamp());
     fflush(stdout);
     if (checkBodyJson(buffer,err,body)){
-        // g_num_mutex.lock();
-        // printf("# [%s]: JSON checado...\n",timeStamp());
-        // fflush(stdout);
         CTask findTask, logFindTask;
         bool boolFindTask = false;
         bool boolLogFindTask = false;
         int idx = -1;
+        int idxLog = -1;
         std::string sendUUID = body["uuid"].asCString();
         findTask = listOfTasks.getTaskByUUID(sendUUID,idx);
-        printf("# [%s]: UUID %s, idx: %i.\n",timeStamp(),sendUUID.c_str(),idx);
-        fflush(stdout);
+        // printf("# [%s]: UUID %s, idx: %i.\n",timeStamp(),sendUUID.c_str(),idx);
+        // fflush(stdout);
         if (idx > -1){
             findTask.setError(body["error"].asCString());
             listOfTasks.setTask(findTask,idx);
-            boolFindTask = true;
-            printf("# [%s]: Task list. %s.\n",timeStamp(),body["error"].asCString());
-            fflush(stdout);
+            if (listOfTasks.writeFileTask() == 0)
+                boolFindTask = true;
+            // printf("# [%s]: Error da task: %s.\n",timeStamp(),findTask.getErrorMessage().c_str());
+            // printf("# [%s]: Task list. %s. Sucess = %i.\n",timeStamp(),body["error"].asCString(),boolFindTask);
+            // fflush(stdout);
         }
-        logFindTask = logListOfTasks.getTaskByUUID(sendUUID,idx);
-        printf("# [%s]: UUID %s, idx: %i.\n",timeStamp(),sendUUID.c_str(),idx);
-        fflush(stdout);
-        if (idx > -1){
+        logFindTask = logListOfTasks.getTaskByUUID(sendUUID,idxLog);
+        // printf("# [%s]: UUID %s, idx: %i.\n",timeStamp(),sendUUID.c_str(),idxLog);
+        // fflush(stdout);
+        if (idxLog > -1){
             logFindTask.setError(body["error"].asCString());
             logListOfTasks.loadFileTask();
-            logListOfTasks.setTask(logFindTask,idx);
-            logListOfTasks.writeFileTask();
+            logListOfTasks.setTask(logFindTask,idxLog);
+            if (listOfTasks.writeFileTask() == 0)
+                boolLogFindTask = true;
             logListOfTasks.freeMemoryFileTask();
-            boolLogFindTask = true;
-            printf("# [%s]: LOG Tasks. %s.\n",timeStamp(),body["error"].asCString());
-            fflush(stdout);
+            // printf("# [%s]: Error da task: %s.\n",timeStamp(),logFindTask.getErrorMessage().c_str());
+            // printf("# [%s]: LOG Tasks. %s. Sucess = %i.\n",timeStamp(),body["error"].asCString(), boolLogFindTask);
+            // fflush(stdout);
         }
         if (boolFindTask | boolLogFindTask)
             response["sucess"] = "1";
         else
             response["sucess"] = "0";
-        // g_num_mutex.unlock();
+
     } else{
         printf("# [%s]: Problema com json: %s.\n",timeStamp(),err.c_str());
         fflush(stdout);
@@ -242,6 +255,12 @@ string solveMessage(string buffer){
     bool postPostpone = buffer.find("POST /postpone HTTP/1.1") != -1;
     bool hasBody  = ((buffer.find("{") != -1) && (buffer.find("}") != -1));
     std::string json_file;
+    printf("# [%s]: hasBody: %i; callSetErrorTasksByID %i.\n",timeStamp(),hasBody,callSetErrorTasksByID);
+    fflush(stdout);
+    if (callSetErrorTasksByID){
+        printf("# [%s]: buffer: %s.\n",timeStamp(),buffer.c_str());
+        fflush(stdout);
+    }
     // TODO: Implementar as demais requisições
     // TODO: modo verbose
     if (getFirst){
@@ -304,6 +323,8 @@ void *getRunParam(void*){
             tTask.setEndTime(timeStamp());
             tTask.setStatus(CTASK_FINISH);
             tTask.setPosition(-1);
+            printf("# [%s]: Error da task: %s.\n",timeStamp(),tTask.getErrorMessage().c_str());
+            fflush(stdout);
             listOfTasks.dequeueTasks(0);
             listOfTasks.writeFileTask();
             logListOfTasks.writeTaskLogFile(tTask);
